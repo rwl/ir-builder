@@ -4,16 +4,31 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class IRBuilder {
 
   private static final Logger LOGGER = Logger.getLogger(IRBuilder.class.getName());
+
+  private static class Function {
+    Function(IType retType, String sig, List<IType> argTypes) {
+      this.retType = retType;
+      this.signature = sig;
+      this.argTypes = argTypes;
+    }
+    IType retType;
+    String signature;
+    List<IType> argTypes;
+  }
 
   private final String moduleId;
 
@@ -35,6 +50,9 @@ public class IRBuilder {
 
   private int _localConstantCounter = 0;
 
+  private final Map<String, Function> funcs = new HashMap<String, Function>();
+  private final Map<IValue, String> constants = new HashMap<IValue, String>();
+
   private final Set<String> globalNames = new HashSet<String>();
 
   public IRBuilder(String moduleId) {
@@ -47,7 +65,7 @@ public class IRBuilder {
     try {
       build(writer);
     } catch (IOException e) {
-      // ignore
+      // ignore for StringWriter
     }
     return writer.toString();
   }
@@ -126,7 +144,7 @@ public class IRBuilder {
   /**
    * @param name may be null
    */
-  public IRBuilder constant(String name, String constant) {
+  public IRBuilder constant(String name, IValue constant) {
     assert constant != null;
     if (name == null || name.isEmpty()) {
       name = getConstantCounter();
@@ -134,13 +152,9 @@ public class IRBuilder {
 
     setActiveBuffer(globalBuffer);
 
-    write("@%s = private unnamed_addr constant [%d x i8] c\"%s\\00\"\n",
-        name, constant.length() + 1, escape(constant));
+    write("@%s = private unnamed_addr constant %s\n", name, constant.ir());
+    constants.put(constant, name);
     return this;
-  }
-
-  private String escape(String str) {
-    return str;
   }
 
   /**
@@ -187,22 +201,25 @@ public class IRBuilder {
 
     setActiveBuffer(funcDefBuffer);
 
-    write("define %s @%s(", retType.ir(), name);
+    write("define %s @%s", retType.ir(), name);
+    String sig = "(";
     for (int i = 0; i < argTypes.size(); i++) {
       IType argType = argTypes.get(i);
       String argName = argNames.get(i);
-      write("%s %%%s", argType.ir(), argName);
+      sig += String.format("%s %%%s", argType.ir(), argName);
     }
     if (varArgs) {
-      write(", ...");
+      sig += ", ...";
     }
-    write(")");
+    sig += ")";
+    write(sig);
     if (attrs != null) {
       for (AttrKind attrKind : attrs) {
         write(" %s", attrKind.kind());
       }
     }
     write(" {\n");
+    funcs.put(name, new Function(retType, sig, argTypes));
     return this;
   }
 
@@ -236,35 +253,55 @@ public class IRBuilder {
 
     setActiveBuffer(funcDeclBuffer);
 
-    write("declare %s @%s(", retType.ir(), name);
+    write("declare %s @%s", retType.ir(), name);
+    String sig = "(";
     if (argTypes != null) {
       for (int i = 0; i < argTypes.size(); i++) {
         IType argType = argTypes.get(i);
-        write("%s", argType.ir());
+        sig += String.format("%s", argType.ir());
       }
       if (varArgs) {
-        write(", ...");
+        sig += ", ...";
       }
     }
-    write(")");
+    sig += ")";
+    write(sig);
     if (attrs != null) {
       for (AttrKind attrKind : attrs) {
         write(" %s", attrKind.kind());
       }
     }
     write("\n");
+    funcs.put(name, new Function(retType, sig, argTypes));
     return this;
   }
 
-  public IRBuilder call(String name) {
+  public IRBuilder call(String name, List<IValue> argVals) {
     assert name != null;
     assert !name.isEmpty();
+    Function func = funcs.get(name);
+    assert func != null;
+    IType retType = func.retType;
+    String fnty = func.signature + '*';
+    List<IType> argTypes = func.argTypes;
 
     setActiveBuffer(funcDefBuffer);
 
-    indent("call @%s" , name);
-    write("\n");
+    indent("call %s %s @%s(", retType.ir(), fnty, name);
+    for (int i = 0; i < argVals.size(); i++) {
+      IValue val = argVals.get(i);
+      IType argType = argTypes.get(i);
+      if (argType instanceof PointerType) {
+        gep(argType, constants.get(val), val);
+      }
+    }
+    write(")\n");
     return this;
+  }
+
+  private void gep(IType retType, String name, IValue val) {
+    write("%s getelementptr inbounds (%s @%s, i32 0, i32 0)",
+        retType.ir(), val.type().pointerTo().ir(), name);
   }
 
   private void setActiveBuffer(StringBuilder buffer) {
