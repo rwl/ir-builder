@@ -1,4 +1,7 @@
-package com.github.rwl.irbuilder;
+package com.github.rwl.irbuilder.values;
+
+import com.github.rwl.irbuilder.types.IType;
+import com.github.rwl.irbuilder.types.VoidType;
 
 public class VoidValue implements IValue {
 

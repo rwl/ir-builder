@@ -1,4 +1,4 @@
-package com.github.rwl.irbuilder;
+package com.github.rwl.irbuilder.types;
 
 public class OpaqueType extends AbstractType {
 

@@ -14,6 +14,19 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.github.rwl.irbuilder.enums.ArchType;
+import com.github.rwl.irbuilder.enums.AttrKind;
+import com.github.rwl.irbuilder.enums.EnvironmentType;
+import com.github.rwl.irbuilder.enums.Linkage;
+import com.github.rwl.irbuilder.enums.OSType;
+import com.github.rwl.irbuilder.enums.VendorType;
+import com.github.rwl.irbuilder.types.IType;
+import com.github.rwl.irbuilder.types.NamedType;
+import com.github.rwl.irbuilder.types.PointerType;
+import com.github.rwl.irbuilder.types.VoidType;
+import com.github.rwl.irbuilder.values.IValue;
+import com.github.rwl.irbuilder.values.VoidValue;
+
 
 public class IRBuilder {
 
@@ -43,8 +56,7 @@ public class IRBuilder {
       globalBuffer, funcDefBuffer, funcDeclBuffer, metadataBuffer};
 
   private StringBuilder _activeBuffer;
-
-  private int _constantCounter = 0;
+;
   private int _globalCounter = 0;
   private int _globalNameCounter = 0;
 
@@ -52,6 +64,7 @@ public class IRBuilder {
 
   private final Map<String, Function> funcs = new HashMap<String, Function>();
   private final Map<IValue, String> constants = new HashMap<IValue, String>();
+  private final Map<String, IType> localTypes = new HashMap<String, IType>();
 
   private final Set<String> globalNames = new HashSet<String>();
 
@@ -71,7 +84,7 @@ public class IRBuilder {
   }
 
   public void build(Writer out) throws IOException {
-    out.write("; ModuleID = '" + moduleId + "'\n");
+    out.write("; ModuleID = '" + moduleId + "'\n\n");
     for (StringBuilder buffer : buffers) {
       if (buffer.length() > 0) {
         out.write(buffer.toString());
@@ -141,36 +154,72 @@ public class IRBuilder {
     return this;
   }
 
+  public IRBuilder namedType(NamedType namedType) {
+    assert namedType != null;
+
+    setActiveBuffer(namedTypeBuffer);
+
+    write("%s = type %s\n", namedType.ir(), namedType.getType().ir());
+    return this;
+  }
+
   /**
    * @param name may be null
+   * @param linkage may be null
    */
-  public IRBuilder constant(String name, IValue constant) {
+  public IRBuilder constant(String name, IValue constant, Linkage linkage,
+      boolean unnamedAddr) {
     assert constant != null;
     if (name == null || name.isEmpty()) {
-      name = getConstantCounter();
+      name = getGlobalCounter();
+    } else if (globalNames.contains(name)) {
+      name += getGlobalCounter();
+    }
+    if (linkage == null) {
+      linkage = Linkage.PRIVATE;
     }
 
     setActiveBuffer(globalBuffer);
 
-    write("@%s = private unnamed_addr constant %s\n", name, constant.ir());
+    write("@%s = %s", name, linkage.linkage());
+    if (unnamedAddr) {
+      write(" unnamed_addr");
+    }
+    write(" constant %s\n", constant.ir());
     constants.put(constant, name);
+    globalNames.add(name);
     return this;
   }
 
   /**
    * @param name may be null
    * @param init may be null
+   * @param linkage may be null
    */
-  public IRBuilder global(String name, IType type, IValue init) {
+  public IRBuilder global(String name, IType type, IValue init, Linkage linkage,
+      boolean unnamedAddr) {
     assert type != null;
     if (name == null || name.isEmpty()) {
       name = getGlobalCounter();
+    } else if (globalNames.contains(name)) {
+      name += getGlobalCounter();
+    }
+    if (linkage == null) {
+      linkage = Linkage.INTERNAL;
     }
 
     setActiveBuffer(globalBuffer);
 
-    write("@%s = internal global %s %s\n", name, type.ir(),
-        init != null ? init.ir() : "zeroinitializer");
+    write("@%s = %s", name, linkage.linkage());
+    if (unnamedAddr) {
+      write(" unnamed_addr");
+    }
+    write(" global %s", type.ir());
+    if (init != null) {
+      write(" %s", init.ir());
+    }
+    write("\n");
+    globalNames.add(name);
     return this;
   }
 
@@ -207,6 +256,10 @@ public class IRBuilder {
       IType argType = argTypes.get(i);
       String argName = argNames.get(i);
       sig += String.format("%s %%%s", argType.ir(), argName);
+      if (i != argTypes.size() - 1) {
+        sig += ", ";
+      }
+      localTypes.put(argName, argType);
     }
     if (varArgs) {
       sig += ", ...";
@@ -290,18 +343,69 @@ public class IRBuilder {
     indent("call %s %s @%s(", retType.ir(), fnty, name);
     for (int i = 0; i < argVals.size(); i++) {
       IValue val = argVals.get(i);
-      IType argType = argTypes.get(i);
-      if (argType instanceof PointerType) {
-        gep(argType, constants.get(val), val);
+      //IType argType = argTypes.get(i);
+//      if (argType instanceof PointerType) {
+//        gep(argType, constants.get(val), val);
+//      }
+      write("%s", val.ir());
+      if (i != argVals.size() - 1) {
+        write(", ");
       }
     }
     write(")\n");
     return this;
   }
 
-  private void gep(IType retType, String name, IValue val) {
-    write("%s getelementptr inbounds (%s @%s, i32 0, i32 0)",
-        retType.ir(), val.type().pointerTo().ir(), name);
+//  private void gep(IType retType, String name, IValue val) {
+//    write("%s getelementptr inbounds (%s @%s, i32 0, i32 0)",
+//        retType.ir(), val.type().pointerTo().ir(), name);
+//  }
+
+  /**
+   * @param name may be null
+   * @param num may be null
+   */
+  public IRBuilder alloca(IType type, String name, Integer num) {
+    assert type != null;
+    if (name == null) {
+      name = getLocalConstantCounter();
+    }
+
+    setActiveBuffer(funcDefBuffer);
+
+    indent("%%%s = alloca %s", name, type.ir());
+    if (num != null) {
+      indent(", %s %d", type.ir(), num);
+    }
+    write("\n");
+    localTypes.put(name, type);
+    return this;
+  }
+
+  public IRBuilder store(String assignee, String constant) {
+    assert constant != null;
+    assert assignee != null;
+    IType type = localTypes.get(constant);
+    assert type != null;
+
+    setActiveBuffer(funcDefBuffer);
+
+    indent("store %s %%%s, %s %%%s", type.ir(), constant,
+        type.pointerTo().ir(), assignee);
+    write("\n");
+    return this;
+  }
+
+  public IRBuilder store(String assignee, IValue val) {
+    assert val != null;
+    assert assignee != null;
+
+    setActiveBuffer(funcDefBuffer);
+
+    indent("store %s, %s %%%s", val.ir(), val.type().pointerTo().ir(),
+        assignee);
+    write("\n");
+    return this;
   }
 
   private void setActiveBuffer(StringBuilder buffer) {
@@ -312,14 +416,12 @@ public class IRBuilder {
     _activeBuffer.append(String.format(s, args));
   }
 
-  private void indent(String s, Object... args) {
-    write("  " + s, args);
+  private void write(String s) {
+    _activeBuffer.append(s);
   }
 
-  private String getConstantCounter() {
-    int cnt = _constantCounter;
-    _constantCounter += 1;
-    return String.valueOf(cnt);
+  private void indent(String s, Object... args) {
+    write("  " + s, args);
   }
 
   private String getGlobalNameCounter() {
@@ -338,6 +440,13 @@ public class IRBuilder {
     int cnt = _localConstantCounter;
     _localConstantCounter += 1;
     return String.valueOf(cnt);
+  }
+
+  public String uniqueGlobalName(String candidate) {
+    if (globalNames.contains(candidate)) {
+      candidate += getGlobalCounter();
+    }
+    return candidate;
   }
 
 }

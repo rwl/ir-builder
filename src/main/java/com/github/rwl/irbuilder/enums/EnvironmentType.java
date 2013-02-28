@@ -1,4 +1,4 @@
-package com.github.rwl.irbuilder;
+package com.github.rwl.irbuilder.enums;
 
 public enum EnvironmentType {
   UNKNOWN_ENVIRONMENT ("UnknownEnvironment"),

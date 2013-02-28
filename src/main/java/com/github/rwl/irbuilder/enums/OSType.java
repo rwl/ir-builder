@@ -1,4 +1,4 @@
-package com.github.rwl.irbuilder;
+package com.github.rwl.irbuilder.enums;
 
 public enum OSType {
   UNKNOWN_OS ("UnknownOS"),

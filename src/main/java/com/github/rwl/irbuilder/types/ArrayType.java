@@ -1,4 +1,4 @@
-package com.github.rwl.irbuilder;
+package com.github.rwl.irbuilder.types;
 
 public class ArrayType extends AbstractType {
 
@@ -13,6 +13,10 @@ public class ArrayType extends AbstractType {
   @Override
   public String ir() {
     return String.format("[%d x %s]", length, type.ir());
+  }
+
+  public IType getType() {
+    return type;
   }
 
 }
