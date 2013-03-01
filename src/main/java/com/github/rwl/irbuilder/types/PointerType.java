@@ -13,4 +13,8 @@ public class PointerType extends AbstractType {
     return String.format("%s*", type.ir());
   }
 
+  public IType getType() {
+    return type;
+  }
+
 }

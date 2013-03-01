@@ -1,6 +1,7 @@
 package com.github.rwl.irbuilder.test;
 
 import com.github.rwl.irbuilder.IRBuilder;
+import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
 import com.github.rwl.irbuilder.types.IntType;
 import com.github.rwl.irbuilder.values.IValue;
@@ -16,9 +17,9 @@ public class HelloTest extends TestCase {
 
     String ir = new IRBuilder("top")
       .constant(null, hello, null, false)
-      .functionDecl(IntType.INT_32, "puts", Lists.<IType>newArrayList(
-          IntType.INT_8.pointerTo()), null, false)
-      .beginFunction(null, "main", null, null, null, false)
+      .functionDecl("puts", new FunctionType(IntType.INT_32, Lists
+          .<IType>newArrayList(IntType.INT_8.pointerTo())), null, false)
+      .beginFunction("main", null, null, null, false)
       .call("puts", Lists.<IValue>newArrayList(hello))
       .endFunction(null)
       .build();

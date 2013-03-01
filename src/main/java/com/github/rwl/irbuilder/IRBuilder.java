@@ -11,8 +11,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import com.github.rwl.irbuilder.enums.ArchType;
 import com.github.rwl.irbuilder.enums.AttrKind;
@@ -20,28 +18,14 @@ import com.github.rwl.irbuilder.enums.EnvironmentType;
 import com.github.rwl.irbuilder.enums.Linkage;
 import com.github.rwl.irbuilder.enums.OSType;
 import com.github.rwl.irbuilder.enums.VendorType;
+import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
 import com.github.rwl.irbuilder.types.NamedType;
-import com.github.rwl.irbuilder.types.PointerType;
-import com.github.rwl.irbuilder.types.VoidType;
 import com.github.rwl.irbuilder.values.IValue;
 import com.github.rwl.irbuilder.values.VoidValue;
 
 
 public class IRBuilder {
-
-  private static final Logger LOGGER = Logger.getLogger(IRBuilder.class.getName());
-
-  private static class Function {
-    Function(IType retType, String sig, List<IType> argTypes) {
-      this.retType = retType;
-      this.signature = sig;
-      this.argTypes = argTypes;
-    }
-    IType retType;
-    String signature;
-    List<IType> argTypes;
-  }
 
   private final String moduleId;
 
@@ -56,13 +40,13 @@ public class IRBuilder {
       globalBuffer, funcDefBuffer, funcDeclBuffer, metadataBuffer};
 
   private StringBuilder _activeBuffer;
-;
+
   private int _globalCounter = 0;
   private int _globalNameCounter = 0;
 
   private int _localConstantCounter = 0;
 
-  private final Map<String, Function> funcs = new HashMap<String, Function>();
+  private final Map<String, FunctionType> funcs = new HashMap<String, FunctionType>();
   private final Map<IValue, String> constants = new HashMap<IValue, String>();
   private final Map<String, IType> localTypes = new HashMap<String, IType>();
 
@@ -229,50 +213,43 @@ public class IRBuilder {
    * @param argNames may be null
    * @param attrs may be null
    */
-  public IRBuilder beginFunction(IType retType, String name, List<IType> argTypes,
+  public IRBuilder beginFunction(String name, FunctionType funcType,
       List<String> argNames, List<AttrKind> attrs, boolean varArgs) {
-    if (retType == null) {
-      retType = VoidType.INSTANCE;
-    }
     assert name != null;
-    if (argTypes == null) {
-      argTypes = new ArrayList<IType>();
-    }
+    assert funcType != null;
     if (argNames != null) {
-      assert argTypes != null;
-      assert argTypes.size() == argNames.size();
+      assert funcType.getArgTypes().size() == argNames.size();
     } else {
       argNames = new ArrayList<String>();
-      for (Iterator<IType> it = argTypes.iterator(); it.hasNext();) {
+      for (Iterator<IType> it = funcType.getArgTypes().iterator(); it.hasNext();) {
         argNames.add(getLocalConstantCounter());
       }
     }
 
     setActiveBuffer(funcDefBuffer);
 
-    write("define %s @%s", retType.ir(), name);
-    String sig = "(";
-    for (int i = 0; i < argTypes.size(); i++) {
-      IType argType = argTypes.get(i);
+    write("define %s @%s", funcType.getRetType().ir(), name);
+    write("(");
+    for (int i = 0; i < funcType.getArgTypes().size(); i++) {
+      IType argType = funcType.getArgTypes().get(i);
       String argName = argNames.get(i);
-      sig += String.format("%s %%%s", argType.ir(), argName);
-      if (i != argTypes.size() - 1) {
-        sig += ", ";
+      write("%s %%%s", argType.ir(), argName);
+      if (i != funcType.getArgTypes().size() - 1) {
+        write(", ");
       }
       localTypes.put(argName, argType);
     }
     if (varArgs) {
-      sig += ", ...";
+      write(", ...");
     }
-    sig += ")";
-    write(sig);
+    write(")");
     if (attrs != null) {
       for (AttrKind attrKind : attrs) {
         write(" %s", attrKind.kind());
       }
     }
     write(" {\n");
-    funcs.put(name, new Function(retType, sig, argTypes));
+    funcs.put(name, funcType);
     return this;
   }
 
@@ -297,56 +274,48 @@ public class IRBuilder {
    * @param argTypes may be null
    * @param attrs may be null
    */
-  public IRBuilder functionDecl(IType retType, String name, List<IType> argTypes,
+  public IRBuilder functionDecl(String name, FunctionType funcType,
       List<AttrKind> attrs, boolean varArgs) {
-    if (retType == null) {
-      retType = VoidType.INSTANCE;
-    }
     assert name != null;
+    assert funcType != null;
 
     setActiveBuffer(funcDeclBuffer);
 
-    write("declare %s @%s", retType.ir(), name);
-    String sig = "(";
-    if (argTypes != null) {
-      for (int i = 0; i < argTypes.size(); i++) {
-        IType argType = argTypes.get(i);
-        sig += String.format("%s", argType.ir());
-      }
-      if (varArgs) {
-        sig += ", ...";
-      }
+    write("declare %s @%s", funcType.getRetType().ir(), name);
+    write("(");
+    for (int i = 0; i < funcType.getArgTypes().size(); i++) {
+      IType argType = funcType.getArgTypes().get(i);
+      write("%s", argType.ir());
     }
-    sig += ")";
-    write(sig);
+    if (varArgs) {
+      write(", ...");
+    }
+    write(")");
     if (attrs != null) {
       for (AttrKind attrKind : attrs) {
         write(" %s", attrKind.kind());
       }
     }
     write("\n");
-    funcs.put(name, new Function(retType, sig, argTypes));
+    funcs.put(name, funcType);
     return this;
   }
 
   public IRBuilder call(String name, List<IValue> argVals) {
+    return call(name, argVals, funcs.get(name));
+  }
+
+  public IRBuilder call(String name, List<IValue> argVals,
+      FunctionType funcType) {
     assert name != null;
     assert !name.isEmpty();
-    Function func = funcs.get(name);
-    assert func != null;
-    IType retType = func.retType;
-    String fnty = func.signature + '*';
-    List<IType> argTypes = func.argTypes;
+    assert funcType != null;
 
     setActiveBuffer(funcDefBuffer);
 
-    indent("call %s %s @%s(", retType.ir(), fnty, name);
+    indent("call %s @%s(", funcType.ir(), name);
     for (int i = 0; i < argVals.size(); i++) {
       IValue val = argVals.get(i);
-      //IType argType = argTypes.get(i);
-//      if (argType instanceof PointerType) {
-//        gep(argType, constants.get(val), val);
-//      }
       write("%s", val.ir());
       if (i != argVals.size() - 1) {
         write(", ");
@@ -355,11 +324,6 @@ public class IRBuilder {
     write(")\n");
     return this;
   }
-
-//  private void gep(IType retType, String name, IValue val) {
-//    write("%s getelementptr inbounds (%s @%s, i32 0, i32 0)",
-//        retType.ir(), val.type().pointerTo().ir(), name);
-//  }
 
   /**
    * @param name may be null

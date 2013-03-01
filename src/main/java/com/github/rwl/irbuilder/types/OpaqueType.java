@@ -4,7 +4,7 @@ public class OpaqueType extends AbstractType {
 
   public static final OpaqueType INSTANCE = new OpaqueType();
 
-  private OpaqueType() {
+  public OpaqueType() {
   }
 
   @Override
