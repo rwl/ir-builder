@@ -21,6 +21,7 @@ import com.github.rwl.irbuilder.enums.VendorType;
 import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
 import com.github.rwl.irbuilder.types.NamedType;
+import com.github.rwl.irbuilder.values.GlobalValue;
 import com.github.rwl.irbuilder.values.IValue;
 import com.github.rwl.irbuilder.values.VoidValue;
 
@@ -151,7 +152,7 @@ public class IRBuilder {
    * @param name may be null
    * @param linkage may be null
    */
-  public IRBuilder constant(String name, IValue constant, Linkage linkage,
+  public GlobalValue constant(String name, IValue constant, Linkage linkage,
       boolean unnamedAddr) {
     assert constant != null;
     if (name == null || name.isEmpty()) {
@@ -172,15 +173,41 @@ public class IRBuilder {
     write(" constant %s\n", constant.ir());
     constants.put(constant, name);
     globalNames.add(name);
-    return this;
+    return new GlobalValue(name, constant.type());
   }
 
   /**
    * @param name may be null
-   * @param init may be null
    * @param linkage may be null
    */
-  public IRBuilder global(String name, IType type, IValue init, Linkage linkage,
+  public GlobalValue global(String name, IValue init, Linkage linkage,
+      boolean unnamedAddr) {
+    assert init != null;
+    if (name == null || name.isEmpty()) {
+      name = getGlobalCounter();
+    } else if (globalNames.contains(name)) {
+      name += getGlobalCounter();
+    }
+    if (linkage == null) {
+      linkage = Linkage.INTERNAL;
+    }
+
+    setActiveBuffer(globalBuffer);
+
+    write("@%s = %s", name, linkage.linkage());
+    if (unnamedAddr) {
+      write(" unnamed_addr");
+    }
+    write(" global %s\n", init.ir());
+    globalNames.add(name);
+    return new GlobalValue(name, init.type());
+  }
+
+  /**
+   * @param name may be null
+   * @param linkage may be null
+   */
+  public GlobalValue global(String name, IType type, Linkage linkage,
       boolean unnamedAddr) {
     assert type != null;
     if (name == null || name.isEmpty()) {
@@ -198,13 +225,9 @@ public class IRBuilder {
     if (unnamedAddr) {
       write(" unnamed_addr");
     }
-    write(" global %s", type.ir());
-    if (init != null) {
-      write(" %s", init.ir());
-    }
-    write("\n");
+    write(" global %s\n", type.ir());
     globalNames.add(name);
-    return this;
+    return new GlobalValue(name, type);
   }
 
   /**
@@ -406,11 +429,11 @@ public class IRBuilder {
     return String.valueOf(cnt);
   }
 
-  public String uniqueGlobalName(String candidate) {
-    if (globalNames.contains(candidate)) {
-      candidate += getGlobalCounter();
-    }
-    return candidate;
-  }
+//  public String uniqueGlobalName(String candidate) {
+//    if (globalNames.contains(candidate)) {
+//      candidate += getGlobalCounter();
+//    }
+//    return candidate;
+//  }
 
 }
