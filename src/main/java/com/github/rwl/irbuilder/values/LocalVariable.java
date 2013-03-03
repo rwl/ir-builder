@@ -3,13 +3,13 @@ package com.github.rwl.irbuilder.values;
 import com.github.rwl.irbuilder.types.ArrayType;
 import com.github.rwl.irbuilder.types.IType;
 
-public class GlobalValue implements IValue {
+public class LocalVariable implements IValue {
 
   private final String name;
 
   private final IType type;
 
-  public GlobalValue(String name, IType type){
+  public LocalVariable(String name, IType type){
     this.name = name;
     this.type = type;
   }
@@ -21,7 +21,7 @@ public class GlobalValue implements IValue {
           ((ArrayType) type).getType().pointerTo().ir(), type.pointerTo().ir(),
           name);
     } else {
-      return type.pointerTo().ir() + " @" + name;
+      return type.pointerTo().ir() + " %" + name;
     }
   }
 

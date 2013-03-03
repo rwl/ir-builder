@@ -1,5 +1,6 @@
 package com.github.rwl.irbuilder.types;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class FunctionType extends AbstractType {
@@ -8,9 +9,18 @@ public class FunctionType extends AbstractType {
 
   private final List<IType> argTypes;
 
-  public FunctionType(IType retType, List<IType> argTypes) {
+  private final boolean varArg;
+
+  public FunctionType(IType retType, IType... argTypes) {
+    this.retType = retType;
+    this.argTypes = Arrays.asList(argTypes);
+    this.varArg = false;
+  }
+
+  public FunctionType(IType retType, List<IType> argTypes, boolean varArg) {
     this.retType = retType;
     this.argTypes = argTypes;
+    this.varArg = varArg;
   }
 
   @Override
@@ -23,6 +33,9 @@ public class FunctionType extends AbstractType {
         ir += ", ";
       }
     }
+    if (varArg) {
+      ir += ", ...";
+    }
     return ir + ")";
   }
 
@@ -32,6 +45,10 @@ public class FunctionType extends AbstractType {
 
   public List<IType> getArgTypes() {
     return argTypes;
+  }
+
+  public boolean isVarArg() {
+    return varArg;
   }
 
 }

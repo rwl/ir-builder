@@ -17,7 +17,7 @@ public class ArrayValue implements IValue {
 
   @Override
   public String ir() {
-    String ir = "{ ";
+    String ir = "[";
     for (int i = 0; i < values.size(); i++) {
       IValue value = values.get(i);
       ir += value.ir();
@@ -25,7 +25,7 @@ public class ArrayValue implements IValue {
         ir += ", ";
       }
     }
-    ir += " }";
+    ir += "]";
     return type().ir() + " " + ir;
   }
 

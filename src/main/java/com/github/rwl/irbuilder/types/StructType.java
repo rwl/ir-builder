@@ -25,20 +25,24 @@ public class StructType extends AbstractType {
     return ir;
   }
 
-  public StructType refineAbstractTypeTo(OpaqueType opaque) {
+  /**
+   * @param newType may be null
+   */
+  public StructType refineAbstractTypeTo(OpaqueType opaque,
+      IType newType) {
     for (int i = 0; i < types.length; i++) {
       IType type = types[i];
       int n = 0;
       if (type instanceof PointerType) {
-        type = baseType((PointerType) type);
         n = pointers((PointerType) type, n);
+        type = baseType((PointerType) type);
       }
       if (type.equals(opaque)) {
-        IType newType = this;
+        IType replacement = newType == null ? this : newType;
         for (int j = 0; j < n; j++) {
-          newType = newType.pointerTo();
+          replacement = replacement.pointerTo();
         }
-        types[i] = newType;
+        types[i] = replacement;
       }
     }
     return this;

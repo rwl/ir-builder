@@ -14,7 +14,11 @@ public class StringValue implements IValue {
 
   @Override
   public String ir() {
-    return String.format("%s c\"%s\\00\"", type().ir(), StringValue.escape(value));
+    if (value.length() > 0) {
+      return String.format("%s c\"%s\\00\"", type().ir(), StringValue.escape(value));
+    } else {
+      return String.format("%s zeroinitializer", type().ir());
+    }
   }
 
   @Override

@@ -1,5 +1,6 @@
 package com.github.rwl.irbuilder.values;
 
+import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
 
 public class BitCast implements IValue {
@@ -15,12 +16,18 @@ public class BitCast implements IValue {
 
   @Override
   public String ir() {
-    return String.format("%s bitcast(%s to %s)", type.ir(), value.ir(), type.ir());
+    if (type instanceof FunctionType) {
+      return String.format("%s bitcast(%s to %s)",
+          ((FunctionType) type).getRetType().ir(), value.ir(), type.ir());
+    } else {
+      return String.format("%s bitcast(%s to %s)", type.ir(), value.ir(),
+          type.ir());
+    }
   }
 
   @Override
   public IType type() {
-    throw new RuntimeException("bitcast has no type");
+    return type;
   }
 
 }
