@@ -2,6 +2,7 @@ package com.github.rwl.irbuilder.values;
 
 import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
+import com.github.rwl.irbuilder.types.PointerType;
 
 public class BitCast implements IValue {
 
@@ -16,9 +17,11 @@ public class BitCast implements IValue {
 
   @Override
   public String ir() {
-    if (type instanceof FunctionType) {
+    if (type instanceof PointerType &&
+        ((PointerType) type).pointsToType() instanceof FunctionType) {
       return String.format("%s bitcast(%s to %s)",
-          ((FunctionType) type).getRetType().ir(), value.ir(), type.ir());
+          ((FunctionType) ((PointerType) type).pointsToType()).getRetType().ir(),
+          value.ir(), type.ir());
     } else {
       return String.format("%s bitcast(%s to %s)", type.ir(), value.ir(),
           type.ir());
@@ -27,7 +30,11 @@ public class BitCast implements IValue {
 
   @Override
   public IType type() {
-    return type;
+    if (type instanceof FunctionType) {
+      return ((FunctionType) type).getRetType();
+    } else {
+      return type;
+    }
   }
 
 }

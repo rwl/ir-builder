@@ -2,35 +2,36 @@ package com.github.rwl.irbuilder.values;
 
 import com.github.rwl.irbuilder.types.ArrayType;
 import com.github.rwl.irbuilder.types.IType;
+import com.github.rwl.irbuilder.types.PointerType;
 
 public class GlobalVariable implements IValue {
 
   private final String name;
 
-  private final IType type;
+  private final PointerType pointerType;
 
-  public GlobalVariable(String name, IType type){
+  public GlobalVariable(String name, PointerType type){
     this.name = name;
-    this.type = type;
+    this.pointerType = type;
   }
 
   @Override
   public String ir() {
-    if (type instanceof ArrayType) {
+    if (pointerType.pointsToType() instanceof ArrayType) {
       return String.format("%s getelementptr inbounds (%s @%s, i32 0, i32 0)",
-          ((ArrayType) type).getType().pointerTo().ir(), type.pointerTo().ir(),
-          name);
+          ((ArrayType) pointerType.pointsToType()).arrayOfType().pointerTo().ir(),
+          pointerType.ir(), name);
     } else {
-      return type.pointerTo().ir() + " @" + name;
+      return pointerType.ir() + " @" + name;
     }
   }
 
   @Override
   public IType type() {
-    if (type instanceof ArrayType) {
-      return ((ArrayType) type).getType().pointerTo();
+    if (pointerType.pointsToType() instanceof ArrayType) {
+      return ((ArrayType) pointerType.pointsToType()).arrayOfType().pointerTo();
     } else {
-      return type;
+      return pointerType;
     }
   }
 

@@ -2,6 +2,7 @@ package com.github.rwl.irbuilder.values;
 
 import com.github.rwl.irbuilder.types.ArrayType;
 import com.github.rwl.irbuilder.types.IType;
+import com.github.rwl.irbuilder.types.PointerType;
 
 public class LocalVariable implements IValue {
 
@@ -16,12 +17,13 @@ public class LocalVariable implements IValue {
 
   @Override
   public String ir() {
-    if (type instanceof ArrayType) {
+    if (type instanceof PointerType &&
+        ((PointerType) type).pointsToType() instanceof ArrayType) {
       return String.format("%s getelementptr inbounds (%s @%s, i32 0, i32 0)",
-          ((ArrayType) type).getType().pointerTo().ir(), type.pointerTo().ir(),
-          name);
+          ((ArrayType) ((PointerType) type).pointsToType()).pointerTo().ir(),
+          type.ir(), name);
     } else {
-      return type.pointerTo().ir() + " %" + name;
+      return type.ir() + " %" + name;
     }
   }
 

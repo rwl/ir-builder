@@ -4,11 +4,9 @@ import java.io.IOException;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import com.github.rwl.irbuilder.enums.ArchType;
@@ -20,6 +18,7 @@ import com.github.rwl.irbuilder.enums.VendorType;
 import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
 import com.github.rwl.irbuilder.types.NamedType;
+import com.github.rwl.irbuilder.types.PointerType;
 import com.github.rwl.irbuilder.values.GlobalVariable;
 import com.github.rwl.irbuilder.values.IValue;
 import com.github.rwl.irbuilder.values.LocalVariable;
@@ -37,8 +36,14 @@ public class IRBuilder {
   private final StringBuilder funcDeclBuffer = new StringBuilder();
   private final StringBuilder metadataBuffer = new StringBuilder();
 
-  private final StringBuilder[] buffers = {targetBuffer, namedTypeBuffer,
-      globalBuffer, funcDefBuffer, funcDeclBuffer, metadataBuffer};
+  private final StringBuilder[] buffers = {
+      targetBuffer,
+      namedTypeBuffer,
+      globalBuffer,
+      funcDefBuffer,
+      funcDeclBuffer,
+      metadataBuffer
+  };
 
   private StringBuilder _activeBuffer;
 
@@ -46,10 +51,6 @@ public class IRBuilder {
   private int _globalNameCounter = 0;
 
   private int _localConstantCounter = 0;
-
-  private final Map<String, FunctionType> funcs = new HashMap<String, FunctionType>();
-  private final Map<IValue, String> constants = new HashMap<IValue, String>();
-//  private final Map<String, IType> localTypes = new HashMap<String, IType>();
 
   private final Set<String> globalNames = new HashSet<String>();
 
@@ -152,9 +153,9 @@ public class IRBuilder {
    * @param name may be null
    * @param linkage may be null
    */
-  public GlobalVariable constant(String name, IValue constant, Linkage linkage,
+  public GlobalVariable constant(String name, IValue var, Linkage linkage,
       boolean unnamedAddr) {
-    assert constant != null;
+    assert var != null;
     if (name == null || name.isEmpty()) {
       name = getGlobalCounter();
     } else if (globalNames.contains(name)) {
@@ -170,10 +171,9 @@ public class IRBuilder {
     if (unnamedAddr) {
       write(" unnamed_addr");
     }
-    write(" constant %s\n", constant.ir());
-    constants.put(constant, name);
+    write(" constant %s\n", var.ir());
     globalNames.add(name);
-    return new GlobalVariable(name, constant.type());
+    return new GlobalVariable(name, var.type().pointerTo());
   }
 
   /**
@@ -200,7 +200,7 @@ public class IRBuilder {
     }
     write(" global %s\n", init.ir());
     globalNames.add(name);
-    return new GlobalVariable(name, init.type());
+    return new GlobalVariable(name, init.type().pointerTo());
   }
 
   /**
@@ -227,7 +227,7 @@ public class IRBuilder {
     }
     write(" global %s\n", type.ir());
     globalNames.add(name);
-    return new GlobalVariable(name, type);
+    return new GlobalVariable(name, type.pointerTo());
   }
 
   /**
@@ -276,7 +276,6 @@ public class IRBuilder {
       }
     }
     write(" {\n");
-    funcs.put(name, funcType);
     return vars;
   }
 
@@ -312,6 +311,9 @@ public class IRBuilder {
     for (int i = 0; i < funcType.getArgTypes().size(); i++) {
       IType argType = funcType.getArgTypes().get(i);
       write("%s", argType.ir());
+      if (i != funcType.getArgTypes().size() - 1) {
+        write(", ");
+      }
     }
     if (funcType.isVarArg()) {
       write(", ...");
@@ -323,45 +325,20 @@ public class IRBuilder {
       }
     }
     write("\n");
-    funcs.put(name, funcType);
-    return new GlobalVariable(name, funcType);
+    return new GlobalVariable(name, funcType.pointerTo());
   }
 
-//  public LocalVariable call(String name, List<IValue> argVals) {
-//    return call(name, argVals, funcs.get(name));
-//  }
-//
-//  public LocalVariable call(String name, List<IValue> argVals,
-//      FunctionType funcType) {
-//    assert name != null;
-//    assert !name.isEmpty();
-//    assert funcType != null;
-//
-//    setActiveBuffer(funcDefBuffer);
-//
-//    indent("call %s @%s(", funcType.ir(), name);
-//    for (int i = 0; i < argVals.size(); i++) {
-//      IValue val = argVals.get(i);
-//      write("%s", val.ir());
-//      if (i != argVals.size() - 1) {
-//        write(", ");
-//      }
-//    }
-//    write(")\n");
-//    return new LocalVariable(name, funcType.getRetType());
-//  }
-
   public LocalVariable call(IValue funcVar, List<IValue> argVals,
-      String name) {
+      String varName) {
     assert funcVar != null;
     assert argVals != null;
-    if (name == null) {
-      name = getLocalConstantCounter();
+    if (varName == null) {
+      varName = getLocalConstantCounter();
     }
 
     setActiveBuffer(funcDefBuffer);
 
-    indent("%%%s = call %s(", name, funcVar.ir());
+    indent("%%%s = call %s(", varName, funcVar.ir());
     for (int i = 0; i < argVals.size(); i++) {
       IValue val = argVals.get(i);
       write("%s", val.ir());
@@ -370,7 +347,7 @@ public class IRBuilder {
       }
     }
     write(")\n");
-    return new LocalVariable(name, funcVar.type());
+    return new LocalVariable(varName, funcVar.type().pointerTo());
   }
 
   /**
@@ -390,22 +367,8 @@ public class IRBuilder {
       indent(", %s %d", type.ir(), num);
     }
     write("\n");
-//    localTypes.put(name, type);
-    return new LocalVariable(name, type);
+    return new LocalVariable(name, type.pointerTo());
   }
-
-//  public IRBuilder store(String assignee, IValue var) {
-//    assert var != null;
-//    assert assignee != null;
-////    IType type = localTypes.get(constant);
-////    assert type != null;
-//
-//    setActiveBuffer(funcDefBuffer);
-//
-//    indent("store %s %%%s, %s %%%s\n", var.type().ir(), var,
-//        var.type().pointerTo().ir(), assignee);
-//    return this;
-//  }
 
   public IRBuilder store(String assignee, IValue val) {
     assert val != null;
@@ -438,8 +401,11 @@ public class IRBuilder {
 
     indent("%%%s = load %s", name, var.ir());
     write("\n");
-//    localTypes.put(name, global.type());
-    return new LocalVariable(name, var.type());
+    if (var.type() instanceof PointerType) {
+      return new LocalVariable(name, ((PointerType) var.type()).pointsToType());
+    } else {
+      return new LocalVariable(name, var.type());
+    }
   }
 
   public LocalVariable bitcast(IValue var, IType type, String name) {

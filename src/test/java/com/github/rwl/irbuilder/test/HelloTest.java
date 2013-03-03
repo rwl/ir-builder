@@ -4,6 +4,7 @@ import com.github.rwl.irbuilder.IRBuilder;
 import com.github.rwl.irbuilder.types.FunctionType;
 import com.github.rwl.irbuilder.types.IType;
 import com.github.rwl.irbuilder.types.IntType;
+import com.github.rwl.irbuilder.values.GlobalVariable;
 import com.github.rwl.irbuilder.values.IValue;
 import com.github.rwl.irbuilder.values.StringValue;
 import com.google.common.collect.Lists;
@@ -19,9 +20,9 @@ public class HelloTest extends TestCase {
     ir.constant(null, hello, null, false);
     FunctionType ft = new FunctionType(IntType.INT_32,
         IntType.INT_8.pointerTo());
-    ir.functionDecl("puts", ft);
+    GlobalVariable puts = ir.functionDecl("puts", ft);
     ir.beginFunction("main", null, null, null);
-    ir.call("puts", Lists.<IValue>newArrayList(hello));
+    ir.call(puts, Lists.<IValue>newArrayList(hello), null);
     ir.endFunction(null);
 
     System.out.println(ir.build());

@@ -15,7 +15,7 @@ public class ArrayType extends AbstractType {
     return String.format("[%d x %s]", length, type.ir());
   }
 
-  public IType getType() {
+  public IType arrayOfType() {
     return type;
   }
 

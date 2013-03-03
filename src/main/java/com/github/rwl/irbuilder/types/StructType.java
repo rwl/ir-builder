@@ -49,15 +49,15 @@ public class StructType extends AbstractType {
   }
 
   private IType baseType(PointerType type) {
-    if (type.getType() instanceof PointerType) {
-      return baseType((PointerType) type.getType());
+    if (type.pointsToType() instanceof PointerType) {
+      return baseType((PointerType) type.pointsToType());
     }
-    return type.getType();
+    return type.pointsToType();
   }
 
   private int pointers(PointerType type, int i) {
-    if (type.getType() instanceof PointerType) {
-      return pointers((PointerType) type.getType(), i + 1);
+    if (type.pointsToType() instanceof PointerType) {
+      return pointers((PointerType) type.pointsToType(), i + 1);
     }
     return i + 1;
   }
