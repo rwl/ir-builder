@@ -22,6 +22,8 @@ import com.github.rwl.irbuilder.types.PointerType;
 import com.github.rwl.irbuilder.values.GlobalVariable;
 import com.github.rwl.irbuilder.values.IValue;
 import com.github.rwl.irbuilder.values.LocalVariable;
+import com.github.rwl.irbuilder.values.MetadataNode;
+import com.github.rwl.irbuilder.values.NamedMetadata;
 import com.github.rwl.irbuilder.values.VoidValue;
 
 
@@ -34,6 +36,7 @@ public class IRBuilder {
   private final StringBuilder globalBuffer = new StringBuilder();
   private final StringBuilder funcDefBuffer = new StringBuilder();
   private final StringBuilder funcDeclBuffer = new StringBuilder();
+  private final StringBuilder namedMetadataBuffer = new StringBuilder();
   private final StringBuilder metadataBuffer = new StringBuilder();
 
   private final StringBuilder[] buffers = {
@@ -42,6 +45,7 @@ public class IRBuilder {
       globalBuffer,
       funcDefBuffer,
       funcDeclBuffer,
+      namedMetadataBuffer,
       metadataBuffer
   };
 
@@ -51,6 +55,8 @@ public class IRBuilder {
   private int _globalNameCounter = 0;
 
   private int _localConstantCounter = 1;
+
+  private int _unamedMetadataCounter = 0;
 
   private final Set<String> globalNames = new HashSet<String>();
 
@@ -152,7 +158,7 @@ public class IRBuilder {
    * @param linkage may be null
    */
   public GlobalVariable constant(String name, IValue var, Linkage linkage,
-      boolean unnamedAddr) {
+      boolean unnamedAddr, String section) {
     assert var != null;
     if (name == null || name.isEmpty()) {
       name = getGlobalCounter();
@@ -169,7 +175,11 @@ public class IRBuilder {
     if (unnamedAddr) {
       write(" unnamed_addr");
     }
-    write(" constant %s\n", var.ir());
+    write(" constant %s", var.ir());
+    if (section != null) {
+      write(", section \"%s\"", section);
+    }
+    write("\n");
     globalNames.add(name);
     return new GlobalVariable(name, var.type().pointerTo());
   }
@@ -177,9 +187,10 @@ public class IRBuilder {
   /**
    * @param name may be null
    * @param linkage may be null
+   * @param section may be null
    */
   public GlobalVariable global(String name, IValue init, Linkage linkage,
-      boolean unnamedAddr) {
+      boolean unnamedAddr, String section) {
     assert init != null;
     if (name == null || name.isEmpty()) {
       name = getGlobalCounter();
@@ -196,7 +207,11 @@ public class IRBuilder {
     if (unnamedAddr) {
       write(" unnamed_addr");
     }
-    write(" global %s\n", init.ir());
+    write(" global %s", init.ir());
+    if (section != null) {
+      write(", section \"%s\"", section);
+    }
+    write("\n");
     globalNames.add(name);
     return new GlobalVariable(name, init.type().pointerTo());
   }
@@ -206,7 +221,7 @@ public class IRBuilder {
    * @param linkage may be null
    */
   public GlobalVariable global(String name, IType type, Linkage linkage,
-      boolean unnamedAddr) {
+      boolean unnamedAddr, String section) {
     assert type != null;
     if (name == null || name.isEmpty()) {
       name = getGlobalCounter();
@@ -223,7 +238,11 @@ public class IRBuilder {
     if (unnamedAddr) {
       write(" unnamed_addr");
     }
-    write(" global %s\n", type.ir());
+    write(" global %s", type.ir());
+    if (section != null) {
+      write(", section \"%s\"", section);
+    }
+    write("\n");
     globalNames.add(name);
     return new GlobalVariable(name, type.pointerTo());
   }
@@ -436,6 +455,44 @@ public class IRBuilder {
     return new LocalVariable(name, type);
   }
 
+  public MetadataNode metadataNode(IValue... elements) {
+    assert elements.length > 0;
+
+    setActiveBuffer(metadataBuffer);
+
+    String identifier = getUnamedMetadataCounter();
+    write("!%s = metadata !{", identifier);
+    for (int i = 0; i < elements.length; i++) {
+      IValue elem = elements[i];
+      write(elem.ir());
+      if (i != elements.length - 1) {
+        write(", ");
+      }
+    }
+    write("}\n");
+
+    return new MetadataNode(identifier);
+  }
+
+  public NamedMetadata namedMetadata(String name, MetadataNode... nodes) {
+    assert name != null;
+    assert nodes.length > 0;
+
+    setActiveBuffer(namedMetadataBuffer);
+
+    write("!%s = !{", name);
+    for (int i = 0; i < nodes.length; i++) {
+      MetadataNode node = nodes[i];
+      write("!%s", node.getIdentifier());
+      if (i != nodes.length - 1) {
+        write(", ");
+      }
+    }
+    write("}\n");
+
+    return new NamedMetadata(name);
+  }
+
   private void setActiveBuffer(StringBuilder buffer) {
     _activeBuffer = buffer;
   }
@@ -467,6 +524,12 @@ public class IRBuilder {
   private String getLocalConstantCounter() {
     int cnt = _localConstantCounter;
     _localConstantCounter += 1;
+    return String.valueOf(cnt);
+  }
+
+  private String getUnamedMetadataCounter() {
+    int cnt = _unamedMetadataCounter;
+    _unamedMetadataCounter += 1;
     return String.valueOf(cnt);
   }
 
