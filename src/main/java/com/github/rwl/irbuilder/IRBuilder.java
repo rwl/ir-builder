@@ -50,7 +50,7 @@ public class IRBuilder {
   private int _globalCounter = 0;
   private int _globalNameCounter = 0;
 
-  private int _localConstantCounter = 0;
+  private int _localConstantCounter = 1;
 
   private final Set<String> globalNames = new HashSet<String>();
 
@@ -127,17 +127,15 @@ public class IRBuilder {
   /**
    * @param name may be null
    */
-  public IRBuilder namedType(String name, IType type) {
+  public NamedType namedType(String name, IType type) {
     assert type != null;
     assert !"void".equals(name);
     if (name == null || name.isEmpty()) {
       name = getGlobalNameCounter();
     }
-
-    setActiveBuffer(namedTypeBuffer);
-
-    write("%%%s = type %s\n", name, type.ir());
-    return this;
+    NamedType nt = new NamedType(name, type);
+    namedType(nt);
+    return nt;
   }
 
   public IRBuilder namedType(NamedType namedType) {
@@ -347,7 +345,7 @@ public class IRBuilder {
       }
     }
     write(")\n");
-    return new LocalVariable(varName, funcVar.type().pointerTo());
+    return new LocalVariable(varName, funcVar.type());
   }
 
   /**

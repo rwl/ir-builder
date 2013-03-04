@@ -20,4 +20,8 @@ public class NamedType extends AbstractType {
     return type;
   }
 
+  public String getName() {
+    return name;
+  }
+
 }

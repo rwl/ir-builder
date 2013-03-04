@@ -30,8 +30,9 @@ public class BitCast implements IValue {
 
   @Override
   public IType type() {
-    if (type instanceof FunctionType) {
-      return ((FunctionType) type).getRetType();
+    if (type instanceof PointerType &&
+        ((PointerType) type).pointsToType() instanceof FunctionType) {
+      return ((FunctionType) ((PointerType) type).pointsToType()).getRetType();
     } else {
       return type;
     }
