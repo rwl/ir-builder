@@ -322,7 +322,7 @@ public class IRBuilder {
         write(" %s", attrKind.kind());
       }
     }
-    write("\n");
+    write("\n\n");
     return new GlobalVariable(name, funcType.pointerTo());
   }
 
@@ -346,6 +346,24 @@ public class IRBuilder {
     }
     write(")\n");
     return new LocalVariable(varName, funcVar.type());
+  }
+
+  public IRBuilder call(IValue funcVar, List<IValue> argVals) {
+    assert funcVar != null;
+    assert argVals != null;
+
+    setActiveBuffer(funcDefBuffer);
+
+    indent("call %s(", funcVar.ir());
+    for (int i = 0; i < argVals.size(); i++) {
+      IValue val = argVals.get(i);
+      write("%s", val.ir());
+      if (i != argVals.size() - 1) {
+        write(", ");
+      }
+    }
+    write(")\n");
+    return this;
   }
 
   /**
